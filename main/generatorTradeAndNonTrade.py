@@ -227,7 +227,7 @@ def randomNonTrade(selfValue, selfItem):
 
 
 
-with open('../data/tradeAndNonTradePrompts.csv', 'w') as csvfile: 
+with open('../data/tradeAndNonTradePrompts.csv', 'w', newline='') as csvfile: 
     writer = csv.writer(csvfile) 
     writer.writerow(["Trade","isTrade"])
 
@@ -246,3 +246,27 @@ with open('../data/tradeAndNonTradePrompts.csv', 'w') as csvfile:
         selfItem = random.choice(itemList)
 
         writer.writerow([randomNonTrade(selfValue,selfItem), 0])
+
+with open('../data/tradeNotTradeAnnotated.csv', 'w', newline='') as csvfile: 
+    writer = csv.writer(csvfile) 
+    writer.writerow(["Trade","OfferAmount","OfferItem","DesiredAmount","DesiredItem"])
+
+    for x in range(0,3000):
+        selfValue = random.randint(1, 50)
+        oppValue = random.randint(1, 50)
+        selfItem = random.choice(itemList)
+        oppItem = random.choice(itemList)
+        while (oppItem == selfItem):
+            oppItem = random.choice(itemList)
+        
+        writer.writerow([randomSentence(selfValue,selfItem,oppValue,oppItem), selfValue , selfItem, oppValue, oppItem])
+
+    for x in range(0,3000):
+        selfValue = random.randint(1, 50)
+        oppValue = random.randint(1, 50)
+        selfItem = random.choice(itemList)
+        oppItem = random.choice(itemList)
+        while (oppItem == selfItem):
+            oppItem = random.choice(itemList)
+        
+        writer.writerow([randomNonTrade(selfValue,selfItem), selfValue , selfItem, -1, "None"])

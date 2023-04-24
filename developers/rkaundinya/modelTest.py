@@ -1,7 +1,7 @@
 import nltk
 import numpy as np
 
-with open('../../data/tradePrompts.csv', newline='') as csvfile:
+with open('../../data/tradeAndNonTradePrompts.csv', newline='') as csvfile:
     lines = (line for line in csvfile)
     fullFile = np.loadtxt(lines, delimiter=',', skiprows=1, usecols=(0), dtype=object)
 
