@@ -9,6 +9,35 @@ Created on Mon Apr 10 23:53:11 2023
 
 import random
 import csv
+import re
+import numpy as np
+
+def tokenize(text, space = True):
+    tokens = []
+    for token in re.split("([0-9a-zA-Z'-]+)", text):
+        if not space:
+            token = re.sub("[ ]+", "", token)
+        if not token:
+            continue
+        if re.search("[0-9a-zA-Z'-]", token):                    
+            tokens.append(token)
+        else: 
+            tokens.extend(token)
+    return np.array(tokens)
+
+def buildNERIndices(tokens, selfVal, selfItem, oppVal, oppItem):
+    indices = np.zeros(len(randSent))
+    for idx, token in enumerate(tokenizedSent):
+        if token == selfValue:
+            indices[idx] = 1
+        elif token == selfItem:
+            indices[idx] = 2
+        elif token == oppValue:
+            indices[idx] = 3
+        elif token == oppItem:
+            indices[idx] = 4
+
+    return indices
 
 # Agent 1 is making the offer for the trade -  The Offer Agent 
 
@@ -251,15 +280,26 @@ with open('../data/tradeNotTradeAnnotated.csv', 'w', newline='') as csvfile:
     writer = csv.writer(csvfile) 
     writer.writerow(["Trade","OfferAmount","OfferItem","DesiredAmount","DesiredItem"])
 
+    result = np.ones((3000, 2), dtype=np.ndarray)
+
     for x in range(0,3000):
-        selfValue = random.randint(1, 50)
-        oppValue = random.randint(1, 50)
+        selfValue = str(random.randint(1, 50))
+        oppValue = str(random.randint(1, 50))
         selfItem = random.choice(itemList)
         oppItem = random.choice(itemList)
         while (oppItem == selfItem):
             oppItem = random.choice(itemList)
         
-        writer.writerow([randomSentence(selfValue,selfItem,oppValue,oppItem), selfValue , selfItem, oppValue, oppItem])
+        randSent = randomSentence(selfValue,selfItem,oppValue,oppItem)
+        tokenizedSent = tokenize(randSent)
+        indices = buildNERIndices(tokenizedSent, selfValue, selfItem, oppValue, oppItem)
+        
+        result[x][0] = tokenizedSent
+        result[x][1] = indices
+
+        writer.writerow([randSent, selfValue , selfItem, oppValue, oppItem])
+
+    np.save("../data/NPY_Files/NERAnnotatedTradePrompts", result, allow_pickle=True)
 
     for x in range(0,3000):
         selfValue = random.randint(1, 50)
