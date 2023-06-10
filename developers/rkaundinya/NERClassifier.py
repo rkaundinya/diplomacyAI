@@ -5,7 +5,11 @@ import datasets
 import gensim.downloader as api
 import numpy as np
 from tqdm import tqdm
+from EmbNet import EmbNet
+from vocab import Vocab
 from sklearn.metrics import classification_report
+
+exec(open('utilities.py').read())
 
 PATH = './NERClassifierNet.pth'
 SHOULD_TRAIN = False
@@ -14,51 +18,6 @@ NUM_CLASSES = 5
 
 data = np.load("../../data/NPY_Files/NERAnnotatedTradePrompts.npy", allow_pickle=True)
 model = api.load("glove-wiki-gigaword-50")
-
-def to_gpu(x):
-  if torch.cuda.is_available():
-    return x.to('cuda')
-  
-  return x.to('cpu')
-
-"""
-Class that handles mapping to and from words
-to vocab indices
-"""
-class Vocab:
-    #stream is just a param for indexing into the token list of data
-    def __init__(self, stream = 'tokens', target = False):
-        self._target = target
-        if self._target:
-            self._word2idx = {}
-        else:
-            self._word2idx = {'__UNK__': 0, '':1}
-        self._idx2word = {}
-        self._stream = stream
-
-    def train(self, raw_ds):
-        #generate vocab list
-        for sample in raw_ds:
-            for token in sample:
-                t = token.lower()
-                if t not in self._word2idx:
-                    self._word2idx[t] = len(self._word2idx)
-        #rebuild reverse lookup
-        self._idx2word = {v:k for k, v in self._word2idx.items()}
-
-    def encode(self, word):
-        if self._target:
-            return self._word2idx[word]
-        else:
-            #Tries to get the word - if doesn't exist, returns '__UNK__'
-            return self._word2idx.get(word, self._word2idx['__UNK__'])
-    
-    def decode(self, idx):
-        if self._target:
-            return self._idx2word[idx]
-        else:
-            #Tries to get the word - if doesn't exist, returns '__UNK__'
-            return self._idx2word.get(idx, '__UNK__')
         
 vocab = Vocab()
 vocab.train(data[:,0])
@@ -79,7 +38,7 @@ class PyCoNLL2(torch.utils.data.Dataset):
         self._win = window_size
 
         #hard-coded but enumerated
-        self._classes = NUM_CLASSES
+        self._classes = EmbNet.NUM_CLASSES
 
         #setup data containers
         #will be a list of tensors
@@ -134,32 +93,12 @@ for ix in range(vocab_size):
         wvs[ix, :] = torch.tensor(model[word])
     else:
         #if we don't have word in pre-trained set, randomly initialize to a unique vec
-        wvs[ix, :] = torch.randn(WORD_DIM)
+        wvs[ix, :] = torch.randn(EmbNet.WORD_DIM)
 
-class EmbNet(nn.Module):
-    def __init__(self, in_dim, hidden_dim, out_dim, word_vectors):
-        super(EmbNet, self).__init__()
-
-        self._embed = nn.Embedding.from_pretrained(word_vectors, freeze=False)
-        self._lin = nn.Linear(in_dim, hidden_dim)
-        self._act = nn.Sigmoid()
-        self._pred = nn.Linear(hidden_dim, out_dim, bias=False)
-
-    #x is batchSize x windowLength
-    def forward(self, x):
-        #maps batchSize x windowLength -> batchSize x windowLength x wordDim
-        emb = self._embed(x)
-
-        #flattens dimensionality starting at 1st index: (batchSize x windowLength*wordDim)
-        win_emb = torch.flatten(emb, start_dim=1)
-
-        z = self._lin(win_emb)
-        h = self._act(z)
-        y_hat = self._pred(h)
-
-        return y_hat
+#Save pre-trained word embedding matrix
+torch.save(wvs, "../../data/NPY_Files/embeddings.pt")
     
-embed_net = to_gpu(EmbNet(5 * WORD_DIM, WORD_DIM, NUM_CLASSES, wvs))
+embed_net = to_gpu(EmbNet(wvs))
 opt = torch.optim.Adagrad(embed_net.parameters())
 loss_fn = nn.CrossEntropyLoss(reduction='sum')
 
@@ -228,6 +167,7 @@ else:
 
 #Evaluate
 embed_net.eval()
+embed_net.zero_grad()
 
 train_loader = torch.utils.data.DataLoader(train, batch_size=128, shuffle=True)
 val_loader = torch.utils.data.DataLoader(val, batch_size=128, shuffle=True)
