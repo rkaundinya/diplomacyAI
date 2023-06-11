@@ -35,7 +35,7 @@ def convertString(sentence):
 
 def convertText(sample, vocab):
   out = []
-  for r in tqdm(sample):
+  for r in sample:
     out.append(_sample2window(r, vocab))
   return out
 
@@ -246,29 +246,31 @@ for idx, itemIdx in enumerate(aiItemIndices):
 
 AIPlayer.SetResources(aiResources)
 
-#Game start prompts
-print("You have these resources: ")
-player1.DebugPrintResources()
+def PrintAllPlayerResources(bShowAIValues=False):
+    print("You have these resources: ")
+    player1.DebugPrintResources()
 
-print("\nThe AI has these resources: ")
-AIPlayer.DebugPrintResources()
+    print("\nThe AI has these resources: ")
+    AIPlayer.DebugPrintResources(bShowAIValues)
+
+def PrintScores(playerScore, aiScore):
+    print("Player Score: " + str(playerScore))
+    print("AI Score: " + str(aiScore))
+
+#Game start prompts
+PrintAllPlayerResources()
 
 print("You place the following values on Resources: ")
 player1.DebugPrintResourceValueMap()
 
 print("Your job is to convince the AI to make a deal such that you get the best value by offering it trades")
+print("Type 'q' to quit anytime or 'i' to show all player inventories or 'v' to show your value table")
 
-#Game loop
-userInput = ""
-while(True):
-    userInput = input("Enter your deal: ")
-    if (userInput == "q"):
-        break
-    #Process deal with NLP
-    t = convertString(userInput)
-    valTest = convertText(t, vocab)
-    valTest = torch.reshape(valTest[0], (-1,5))
-    logits = embed_net(to_gpu(valTest))
+def ProcessInput(inUserInput, inVocab, model):
+    t = convertString(inUserInput)
+    vals = convertText(t, inVocab)
+    vals = torch.reshape(vals[0], (-1,5))
+    logits = model(to_gpu(vals))
     preds = torch.argmax(logits, dim=-1)
 
     preds = preds.cpu()
@@ -277,21 +279,135 @@ while(True):
     vals,entityCounts = np.unique(preds[np.where(preds != 0)[0]], return_counts=True)
     repeatEntitiesFound = len(np.where(entityCounts != 1)[0]) != 0
 
+    bParseFailure = False
     if (repeatEntitiesFound or entityCounts.size != 4):
+        bParseFailure = True
         print("Could not properly understand input")
 
     t = t.flatten()
-    item1Amt = int(t[np.where(preds == 1)[0]][0])
-    item1 = t[np.where(preds == 2)[0]][0]
-    item2Amt = int(t[np.where(preds == 3)[0]][0])
-    item2 = t[np.where(preds == 4)[0]][0]
+    ner1Indices = np.where(preds == 1)[0]
+    ner2Indices = np.where(preds == 2)[0]
+    ner3Indices = np.where(preds == 3)[0]
+    ner4Indices = np.where(preds == 4)[0]
+    
+    item1Amt = int(t[ner1Indices][0]) if len(ner1Indices) > 0 else None
+    item1 = t[ner2Indices][0] if len(ner2Indices) > 0 else None
+    item2Amt = int(t[ner3Indices][0]) if len(ner3Indices) > 0 else None
+    item2 = t[ner4Indices][0] if len(ner4Indices) > 0 else None
 
-    hasResource,resourceStats = AIPlayer.HasResource(item2)
-    resourceAmt = resourceStats.GetCount()
-    if (hasResource):
-        if (resourceAmt < item2Amt):
-            print("Sorry I only have " + str(resourceAmt) + " " + item2)
+    return bParseFailure, (item1Amt, item1.lower(), item2Amt, item2.lower())
+
+userInput = ""
+
+#Game params
+playerScore = 0
+aiScore = 0
+winScore = 7
+loseScore = -7
+
+#Game loop
+while(True):
+    #Some win conditions
+    if aiScore > winScore and playerScore < aiScore:
+        print("AI has gotten the better of you, better luck next time...")
+        PrintScores(playerScore, aiScore)
+        print("Game Over.")
+        break
+    if playerScore > winScore and playerScore > aiScore:
+        print("You have walked away with the riches of the automaton. Your glory will never be forgotten")
+        PrintScores(playerScore, aiScore)
+        print("Game Over.")
+        break
+    if playerScore > winScore and aiScore == playerScore:
+        print("You and the AI have managed to walk away on equal terms. Your cooperation sets a precedent for generations to come.")
+        PrintScores(playerScore, aiScore)
+        print("Game Over.")
+        break
+    
+    #Some lose conditions
+    if playerScore < loseScore:
+        print("You have made too many ill advised trades. The bank is calling, and it's not for tea...")
+        PrintScores(playerScore, aiScore)
+        print("Game Over.")
+        break
+
+    userInput = input("Enter your deal: ")
+    if (userInput == "q"):
+        break
+    if (userInput.lower() == "i"):
+        PrintAllPlayerResources()
+        continue
+    if (userInput.lower() == "v"):
+        print("You place the following values on Resources:")
+        player1.DebugPrintResourceValueMap()
+        continue
+
+    #Process deal with NLP
+    parseFailure,items = ProcessInput(userInput, vocab, embed_net)
+
+    #Handle AI lack of comprehension
+    if parseFailure:
+        print("I didn't catch that, can you phrase your offer differently?")
+        continue
+
+    item1Amt,item1,item2Amt,item2 = items
+
+    noItemIsNull = item1Amt != None and item1 != None and item2Amt != None and item2 != None
+
+    #Standin Agent response logic
+    if noItemIsNull:
+        aiHasItem2,aiItem2Stats = AIPlayer.HasResource(item2)
+        playerHasItem1,playerItem1Stats = player1.HasResource(item1)
+
+        pItem1ResCnt = 0
+
+        if not playerHasItem1:
+            print("Are you trying to fool me? I don't do business with scoundrels.")
+            continue
         else:
-            print("I do have " + str(resourceAmt) + item2 + " to trade.")
+            pItem1ResCnt = playerItem1Stats.GetCount()
+            if (pItem1ResCnt < item1Amt):
+                print("Are you trying to fool me? I don't do business with scoundrels.")
+                continue
+
+        if (aiHasItem2):
+            resourceAmt = aiItem2Stats.GetCount()
+            resourceVal = aiItem2Stats.GetValue()
+
+            totalAILoss = item2Amt * resourceVal
+            totalAIGain = item1Amt * AIPlayer.GetResourceValue(item1)
+
+            if (resourceAmt < item2Amt):
+                print("Sorry I only have " + str(resourceAmt) + " " + item2)
+                continue
+
+            if totalAIGain > totalAILoss:
+                #Calculate net gain and add to AI score
+                netAIGain = totalAIGain - totalAILoss
+                aiScore += netAIGain
+                
+                playerLoss = item1Amt * player1.GetResourceValue(item1)
+                playerGain = item2Amt * player1.GetResourceValue(item2)
+                netPlayerGain = playerGain - playerLoss
+                playerScore += netPlayerGain
+
+                AIPlayer.UpdateResourceCount(item2, -item2Amt)
+                AIPlayer.UpdateResourceCount(item1, item1Amt)
+
+                player1.UpdateResourceCount(item2, item2Amt)
+                player1.UpdateResourceCount(item1, -item1Amt)
+                
+                print("I accept this offer.")
+            else:
+                print("I'm not ready to make this trade.")
+
+        else:
+            print("Sorry I do not have any " + item2)
+
+print("\nPlayer Value Map: ")
+player1.DebugPrintResourceValueMap()
+
+print("AI Value Map: ")
+AIPlayer.DebugPrintResourceValueMap()
 
 print("Exited Game")
