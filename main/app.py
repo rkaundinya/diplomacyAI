@@ -90,53 +90,8 @@ embed_net.zero_grad()
 vocab = Vocab()
 vocab.train(data[:,0])
 
-t = convertString("I'm interested in trading 9 wheat for 11 aluminum. What do you think?")
-valTest = convertText(t, vocab)
-valTest = torch.reshape(valTest[0], (-1,5))
-logits = embed_net(to_gpu(valTest))
-preds = torch.argmax(logits, dim=-1)
-
-print(preds)
-
-#userStr = input("What is your offer?\n")
-userStr = "Give me 5 horses for 3 gold."
-
-t = convertString(userStr)
-valTest = convertText(t, vocab)
-valTest = torch.reshape(valTest[0], (-1,5))
-logits = embed_net(to_gpu(valTest))
-preds = torch.argmax(logits, dim=-1)
-
-print(preds)
-
-preds = preds.cpu()
-
-#Check to make sure no repeat entities were found
-vals,entityCounts = np.unique(preds[np.where(preds != 0)[0]], return_counts=True)
-repeatEntitiesFound = len(np.where(entityCounts != 1)[0]) != 0
-
-if (repeatEntitiesFound or entityCounts.size != 4):
-    print("Could not properly understand input")
-
-t = t.flatten()
-item1Amt = int(t[np.where(preds == 1)[0]][0])
-item1 = t[np.where(preds == 2)[0]][0]
-item2Amt = int(t[np.where(preds == 3)[0]][0])
-item2 = t[np.where(preds == 4)[0]][0]
-
 itemList = ["GOLD", "STONES", "WOOD", "WHEAT", "COAL", "IRON", "ALUMINUM", "HORSES"]
 Resources = Enum('Resources', itemList)
-
-player = Player()
-player.SetResources({Resources.GOLD : ResourceStats(2,5), Resources.WOOD : ResourceStats(3,3)})
-
-hasResource,resourceStats = player.HasResource(item2)
-resourceAmt = resourceStats.GetCount()
-if (hasResource):
-    if (resourceAmt < item2Amt):
-        print("Sorry I only have " + str(resourceAmt) + " " + item2)
-    else:
-        print("I do have " + str(resourceAmt) + item2 + " to trade.")
 
 #Assign Resources
 player1 = Player()
