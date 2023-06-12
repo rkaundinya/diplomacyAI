@@ -51,7 +51,8 @@ class Player:
 
     def HasResource(self, resource):
         if resource in self.resourceNames:
-            return True, self.resources[self.resourceNames[resource]]
+            if self.resourceNames[resource] in self.resources:
+                return True, self.resources[self.resourceNames[resource]]
 
         return False, -1
 
