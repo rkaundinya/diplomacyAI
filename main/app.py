@@ -9,7 +9,7 @@ import numpy as np
 
 exec(open('utilities.py').read())
 
-data = np.load("../../data/NPY_Files/NERAnnotatedTradePrompts.npy", allow_pickle=True)
+data = np.load("../data/NPY_Files/NERAnnotatedTradePrompts.npy", allow_pickle=True)
 
 PATH = './NERClassifierNet.pth'
 
@@ -78,7 +78,7 @@ def GetNumListInRange(maxVal, numItems):
     return numList
   
 #load word embeddings
-pretrainedEmbeddings = torch.load('../../data/NPY_Files/embeddings.pt')
+pretrainedEmbeddings = torch.load('../data/NPY_Files/embeddings.pt')
 
 embed_net = to_gpu(EmbNet(pretrainedEmbeddings))
 embed_net.load_state_dict(torch.load(PATH))
