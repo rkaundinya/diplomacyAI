@@ -10,8 +10,7 @@ import nltk
 from nltk.corpus import wordnet
 import pandas as pd
 import csv
-#nltk.download('wordnet')
-
+nltk.download('wordnet')
 
 list_words=['i', "i'm", "i am", "i'd", "i would", "my", 'your', "you"]
 list_syn={}
@@ -181,6 +180,9 @@ askItemIncorrect = 0
 offerNotFound = 0
 askNotFound = 0
 
+gold = []
+pred = []
+
 with open('trdes.csv', 'r') as f:
     reader = csv.reader(f, delimiter=',')
     for i, line in enumerate(reader):
@@ -191,25 +193,55 @@ with open('trdes.csv', 'r') as f:
         if 'offer' in prediction:
             if line[1] == prediction['offer'][1]:
                 offerCountCorrect += 1
+                
+                pred.append(1)
+                gold.append(1)
             else:
                 offerCountIncorrect += 1
+                pred.append(1)
+                gold.append(0)
             if line[2] == prediction['offer'][0]:
                 offerItemCorrect += 1
+                pred.append(2)
+                gold.append(2)
             else:
                 offerItemIncorrect += 1
+                pred.append(2)
+                gold.append(0)
+
         else:
             offerNotFound += 1
+            
+            pred.append(0)
+            gold.append(1)
+            pred.append(0)
+            gold.append(2)
+            
         if 'ask' in prediction:
             if line[3] == prediction['ask'][1]:
                 askCountCorrect += 1
+                pred.append(3)
+                gold.append(3)
             else:
                 askCountIncorrect += 1
+                pred.append(3)
+                gold.append(0)
             if line[4] == prediction['ask'][0]:
                 askItemCorrect += 1
+                pred.append(4)
+                gold.append(4)
             else:
+                pred.append(4)
+                gold.append(0)
                 askItemIncorrect += 1
         else:
             askNotFound +=1
+
+            pred.append(0)
+            gold.append(3)
+            pred.append(0)
+            gold.append(4)
+    
 
 print("")
 print("Accuracy of Offer Value")
@@ -229,8 +261,5 @@ print("Percentage Not Found / Detected. Total for Asking OR offer")
 print((offerNotFound + askNotFound) / (askCountCorrect + askCountIncorrect + askItemCorrect + askItemIncorrect))
 
 
-
-
-
-
-
+from sklearn.metrics import classification_report
+print(classification_report(gold, pred))
