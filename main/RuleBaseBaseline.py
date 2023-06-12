@@ -183,7 +183,7 @@ askNotFound = 0
 gold = []
 pred = []
 
-with open('trdes.csv', 'r') as f:
+with open('../data/trades.csv', 'r') as f:
     reader = csv.reader(f, delimiter=',')
     for i, line in enumerate(reader):
         itemQuany = connectValuesWithNumbers(line[0].lower())
